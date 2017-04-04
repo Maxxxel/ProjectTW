@@ -31,6 +31,8 @@ function GetMovingArea(unit, spellData)
           Combine endPoints to get the Moving Area
           ++: Precise
           --: Needs more time and power
+    
+        (Generally Note: #rays can be increased in Menu for better Areas but needs more time and power, 8 is minimum)
       +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
       Now we got the Moving Area we need to get the best Spot
       +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
