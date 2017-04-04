@@ -34,6 +34,12 @@ function GetMovingArea(unit, spellData)
     
         (Generally Note: #rays can be increased in Menu for better Areas but needs more time and power, 8 is minimum)
       +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  --]]
+end
+
+function GetBestSpot(unit, spellData)
+  local Area = GetMovingArea(unit, spellData)
+  --[[
       Now we got the Moving Area we need to get the best Spot
       +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
         Way #1:
