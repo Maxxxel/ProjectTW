@@ -288,6 +288,6 @@ end
     -replace ^2 with x * x
     -wrapper for Positions (Vector2, Vector3, unit)
     -add Menu for #Ray casts
-    -Create own class for Polys if 2DGeometry is not loaded, to save performance?
+    -Create own class for Polygon/Circle and the only needed methods if 2DGeometry is not loaded, to save performance?
     -include small and simple Pathfinding into TWPrediction? Just needs AStar, no need for Theta i see here
 --]]
