@@ -13,6 +13,8 @@ require 'Pathfinding'
 TWP_SkillShot = 1 --can hit just 1 target
 TWP_AOESkillShot = 2 --can hit multiple targets
 TWP_AOESpell = 3 --no travelZone, because casted on ground or self
+TWP_CONE = 4 --Talon W
+TWP_CURVE = 5 --Diana
 
 -------------------------------------------------------------------------
 --Variables
@@ -144,12 +146,14 @@ function TWPrediction:GetMovingArea(unit, spell)
 end
 
 function TWPrediction:CreateTravelZone(spell)
-    if spell.type ~= 3 then --1 and 2 are both LineSkillShots, we can ignore the AOE Part here because its only needed for Collision checks
+    if spell.type == 1 or spell.type == 2 then --1 and 2 are both LineSkillShots, we can ignore the AOE Part here because its only needed for Collision checks
         local hitSpot = Circle(_SPELL_END_POS_, spell.width) --include boundingRadius of myHero and unit?
         local tunnel = Polygon(_4_SPOTS_REPRESENTING_THE_SPELL_TRAVEL_PATH)
         local result = nil --Combine hitSpot with tunnel into a Polygon
         
         return result
+    elseif spell.type == 4 then
+    elseif spell.type == 5 then
     else
         return = Circle(myHero, spell.width) --include boundingRadius of myHero and unit?
     end
