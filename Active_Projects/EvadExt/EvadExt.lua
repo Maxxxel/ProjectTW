@@ -29,9 +29,9 @@ function GetOrb()
 end
 
 function BlockExternalMovement() -- Should be used while evading.
-	forceBlockAllow("Block")[GetOrb()]
+	forceBlockAllow("Block")[GetOrb()]()
 end
 
 function AllowExternalMovement() -- Should be used after evading.
-	forceBlockAllow("Allow")[GetOrb()]
+	forceBlockAllow("Allow")[GetOrb()]()
 end
