@@ -1,9 +1,10 @@
 -------------------------------------------------------------------------
 --[[ Changelog:
     0.01: Skeleton
+    0.02: MovingArea Creation added, needs fixes on Polygon creating
 --]]
 -------------------------------------------------------------------------
-_G.TWPrediction_Version = 0.01
+_G.TWPrediction_Version = 0.02
 --Requirements: See To Do at the bottom of the Script
 require '2DGeometry'
 require 'MapPosV2'
