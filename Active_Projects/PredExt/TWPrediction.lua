@@ -4,22 +4,31 @@
 --]]
 -------------------------------------------------------------------------
 _G.TWPrediction_Version = 0.01
-
 --Requirements: See To Do at the bottom of the Script
 require '2DGeometry'
+require 'MapPosV2'
 require 'Pathfinding'
-
 --Spell identifier, used for spell.type
 TWP_SkillShot = 1 --can hit just 1 target
 TWP_AOESkillShot = 2 --can hit multiple targets
 TWP_AOESpell = 3 --no travelZone, because casted on ground or self
 TWP_CONE = 4 --Talon W
 TWP_CURVE = 5 --Diana
-
 -------------------------------------------------------------------------
 --Variables
 -------------------------------------------------------------------------
-local sqrt, pow = math.sqrt, math.pow
+local sqrt, pow, floor, modf, insert, remove = math.sqrt, math.pow, math.floor, math.modf, table.insert, table.remove
+local gridSize = 50
+local Offset = {
+    [1] = {x = 0,   y = 1},     --Top
+    [2] = {x = 1,   y = 0},     --Right
+    [3] = {x = 0,   y = -1},    --Down
+    [4] = {x = -1,  y = 0},     --Left
+    [5] = {x = 1,   y = 1},     --TopRight
+    [6] = {x = -1,  y = 1},     --TopLeft
+    [7] = {x = 1,   y = -1},    --DownRight
+    [8] = {x = -1,  y = -1}     --DownLeft
+}
 -------------------------------------------------------------------------
 --Stuff
 -------------------------------------------------------------------------
@@ -31,12 +40,100 @@ function GetDistanceSqr(Pos1, Pos2)
 end
 
 --Default on 2D its faster but less accurate
-local function GetDistance(p1, p2)
-    return sqrt(pow((p2.x - p1.x),2) + pow((p2.y - p1.y),2))
+local function GetDistance(A, B)
+    A = A.pos or A
+    B = B.pos or B
+
+    return sqrt((A.x - B.x) * (A.x - B.x) + ((A.z or A.y) - (B.z or B.y)) * ((A.z or A.y) - (B.z or B.y)))
 end
 
 local function GetDistance3D(p1, p2)
     return sqrt(pow((p2.x - p1.x),2) + pow((p2.y - p1.y),2) + pow((p2.z - p1.z),2))
+end
+
+class("Area")
+
+function Area:GetDrawPoints2(unit, range)
+    local Quality = 30
+    local wardVector = Vector(unit.pos or unit)
+    local alpha = 0
+    local heh = {}
+    self.postProcess = {}
+
+    for i = 1, Quality do
+        alpha = alpha + 360 / Quality
+        local a = 0.1
+        heh[i] = Vector(wardVector)
+
+        while a < 1 do
+            if isWall(heh[i]) then
+                local vc = Vector(range * math.sin(alpha / 360 * 6.28), 0, range * math.cos(alpha / 360 * 6.28)):Normalized() * range
+                local origin = Vector(wardVector.x + vc.x, wardVector.y, wardVector.z + vc.z)
+                insert(self.postProcess, {
+                    position = i,
+                    endPoint = origin,
+                    collisionPoint = heh[i]
+                })
+
+                break
+            else
+                a = a + 0.025
+                local vc = Vector(range * math.sin(alpha / 360 * 6.28), 0, range * math.cos(alpha / 360 * 6.28)):Normalized() * range * a
+                heh[i] = Vector(wardVector.x + vc.x, wardVector.y, wardVector.z + vc.z)
+            end
+        end
+    end
+
+    return heh
+end
+
+function Area:GetArea(unit, range) --CURRENTLY WORKING ON
+    local _ = self:GetDrawPoints2(unit, range)
+    local P = Polygon()
+
+    if next(self.postProcess) then
+        local newP = {}
+        local lastInsert = 1
+
+        for i = 1, #self.postProcess do
+            local data = self.postProcess[i]
+            local insertAfter = data.position -1
+
+            for k = lastInsert, insertAfter do
+                insert(newP, _[k])
+            end
+            lastInsert = insertAfter + 1
+
+            local Path = LazyTheta:FindPath(unit, data.endPoint, range)
+            if Path and #Path > 0 then
+                local longest = 0
+                local val = {}
+
+                if #Path - 1 > 2 then
+                    newP[#newP] = nil
+                    for j = 1, #Path-1 do
+                        local Point = Path[j]
+                        local Point2 = j + 1 <= #Path and Path[j + 1] or nil
+                        Draw.Text(j, 10, Vector(Point.x, 0, Point.y):To2D())
+                        Draw.Circle(Point.x, 0, Point.y)
+                        insert(newP, Point)
+                    end
+                end
+            end
+
+            if i == #self.postProcess and insertAfter < #_ then
+                for k = insertAfter, #_ do
+                    insert(newP, _[k])
+                end
+            end
+        end
+
+        P.points = newP
+        return P
+    end
+
+    P.points = _
+    return P
 end
 
 class("TWPrediction")
@@ -155,7 +252,7 @@ function TWPrediction:CreateTravelZone(spell)
     elseif spell.type == 4 then
     elseif spell.type == 5 then
     else
-        return = Circle(myHero, spell.width) --include boundingRadius of myHero and unit?
+        return Circle(myHero, spell.width) --include boundingRadius of myHero and unit?
     end
     
     return nil
@@ -281,7 +378,7 @@ end
 --Level
 -------------------------------------------------------------------------
 function TWPrediction:Level(spell)
-  return myHero:GetSpellData(spell).level
+    return myHero:GetSpellData(spell).level
 end
 
 -------------------------------------------------------------------------
@@ -294,4 +391,5 @@ end
     -add Menu for #Ray casts
     -Create own class for Polygon/Circle and the only needed methods if 2DGeometry is not loaded, to save performance?
     -include small and simple Pathfinding into TWPrediction? Just needs AStar, no need for Theta i see here
+    -lineOfSight before Pathfinding?
 --]]
