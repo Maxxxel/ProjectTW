@@ -3,6 +3,8 @@
 --]]
 
 function MaxMovingRange(unit, time)
+  --account for ping + order delays tards
+  --from Tosh ^_^
   return unit.ms * time
 end
 
