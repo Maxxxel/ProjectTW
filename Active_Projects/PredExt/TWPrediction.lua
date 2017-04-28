@@ -1,13 +1,18 @@
 -------------------------------------------------------------------------
 --[[ Changelog:
     0.01: Skeleton
+    0.02: Added GetArea
+    0.03: Added Pathfinding to GetArea
+    '---> Bugs:
+            -Slow (AStar)
+            -Unaccurate Sometimes (Lines 227 - 255)
 --]]
 -------------------------------------------------------------------------
-_G.TWPrediction_Version = 0.01
+_G.TWPrediction_Version = 0.03
 --Requirements: See To Do at the bottom of the Script
 require '2DGeometry'
 require 'MapPosV2'
-require 'Pathfinding'
+local bh = require 'BinaryHeap'
 --Spell identifier, used for spell.type
 TWP_SkillShot = 1 --can hit just 1 target
 TWP_AOESkillShot = 2 --can hit multiple targets
@@ -17,8 +22,9 @@ TWP_CURVE = 5 --Diana
 -------------------------------------------------------------------------
 --Variables
 -------------------------------------------------------------------------
-local sqrt, pow, floor, modf, insert, remove = math.sqrt, math.pow, math.floor, math.modf, table.insert, table.remove
-local gridSize = 50
+local sqrt, pow, floor, modf, insert, remove, sin, cos = math.sqrt, math.pow, math.floor, math.modf, table.insert, table.remove, math.sin, math.cos
+local gridSize = 40
+local grrr = 0.01744444
 local Offset = {
     [1] = {x = 0,   y = 1},     --Top
     [2] = {x = 1,   y = 0},     --Right
@@ -51,89 +57,205 @@ local function GetDistance3D(p1, p2)
     return sqrt(pow((p2.x - p1.x),2) + pow((p2.y - p1.y),2) + pow((p2.z - p1.z),2))
 end
 
+local function lineOfSight(node, neighbor)
+        local x0, x1, y0, y1 = node.x, neighbor.x, node.y, neighbor.y
+        local sx,sy,dx,dy
+
+        if x0 < x1 then
+            sx = gridSize
+            dx = x1 - x0
+        else
+            sx = -gridSize
+            dx = x0 - x1
+        end
+
+        if y0 < y1 then
+            sy = gridSize
+            dy = y1 - y0
+        else
+            sy = -gridSize
+            dy = y0 - y1
+        end
+
+        local err, e2 = dx-dy, nil
+
+        if isWall({x = x0, y = 0, z = y0}) then return false end
+
+        while not(x0 == x1 and y0 == y1) do
+            e2 = err + err
+            if e2 > -dy then
+                err = err - dy
+                x0  = x0 + sx
+            end
+            if e2 < dx then
+                err = err + dx
+                y0  = y0 + sy
+            end
+
+            if isWall({x = x0, y = 0, z = y0}) then return false end
+        end
+
+        return true
+end
+
+class("AStar")
+
+function AStar:StartSession()
+    if not self.started then
+        self.started = true
+        self.N = {}
+    end
+end
+
+function AStar:StopSession()
+    self.started = false
+    self.N = nil
+end
+
+function AStar:GetNeighbors(node, gNode)
+    local Ns = {}
+
+    for i = 1, #Offset do
+        local Off = Offset[i]
+        local N = {x = node.x + Off.x * gridSize, y = node.y, z = node.z + Off.y * gridSize}
+        
+        if not isWall(N) then
+            N.id = tostring(N.x .. N.z)
+            N.parent = node
+            N.g = node.g + GetDistance(N, node)
+            N.h = GetDistance(N, gNode)
+            N.f = N.g + N.h
+            self.Queue:push(N)
+        end
+    end
+
+    return Ns
+end
+
+function AStar:FindPath(start, goal, maxLength)
+    self.Queue = bh()
+    local sNode, gNode = {x = start.x, y = start.y, z = start.z}, {x = goal.x, y = goal.y, z = goal.z}
+    local visited = {}
+    local pre = nil
+    sNode.g = 0
+    sNode.f = 0
+    sNode.parent = nil
+    sNode.id = tostring(sNode.x .. sNode.z)
+    gNode.id = tostring(gNode.x .. gNode.z)
+    self.Queue:push(sNode)
+
+    while not self.Queue:empty() do
+        local cNode = self.Queue:pop()
+        if visited[cNode.id] then goto continue end
+        visited[cNode.id] = true
+
+        if cNode.id == gNode.id then
+            break
+        end
+
+        if cNode.g > maxLength then
+            pre = cNode
+            break
+        end
+
+        self:GetNeighbors(cNode, gNode)
+        ::continue::
+    end
+
+    --BuildPath
+    local test = pre or gNode
+    local Path = {}
+
+    while test do
+        insert(Path, test)
+        test = test.parent
+    end
+
+    return Path
+end
+
 class("Area")
 
-function Area:GetDrawPoints2(unit, range)
-    local Quality = 30
-    local wardVector = Vector(unit.pos or unit)
-    local alpha = 0
-    local heh = {}
-    self.postProcess = {}
+function Area:GetArea(unit, range, qual)
+    AStar:StartSession()
+    local start = unit.pos or unit
+    local turn = 0
+    local Quality = qual or 20
+    local Add = 360 / Quality
+    local Result = Polygon()
+    local preProcess = {}
+    local visited = {}
+    local final = {}
 
     for i = 1, Quality do
-        alpha = alpha + 360 / Quality
-        local a = 0.1
-        heh[i] = Vector(wardVector)
+        turn = turn + Add
+        local Check = nil
+        local multi = turn * grrr
 
-        while a < 1 do
-            if isWall(heh[i]) then
-                local vc = Vector(range * math.sin(alpha / 360 * 6.28), 0, range * math.cos(alpha / 360 * 6.28)):Normalized() * range
-                local origin = Vector(wardVector.x + vc.x, wardVector.y, wardVector.z + vc.z)
-                insert(self.postProcess, {
-                    position = i,
-                    endPoint = origin,
-                    collisionPoint = heh[i]
-                })
+        for _ = 0.1, 1, .025 do
+            local Vec = Vector(range * sin(multi), 0, range * cos(multi)):Normalized() * range * _
+            Check = Vector(start) + Vec
 
-                break
-            else
-                a = a + 0.025
-                local vc = Vector(range * math.sin(alpha / 360 * 6.28), 0, range * math.cos(alpha / 360 * 6.28)):Normalized() * range * a
-                heh[i] = Vector(wardVector.x + vc.x, wardVector.y, wardVector.z + vc.z)
+            if isWall(Check) then
+                local Vec2 = Vector(range * sin(multi), 0, range * cos(multi)):Normalized() * range
+                insert(preProcess, {x = Check.x, y = Check.y, z = Check.z, target = {x = start.x + Vec2.x, y = Check.y, z = start.z + Vec2.z}})
+                
+                goto continue
+            end
+        end
+
+        insert(final, Check)
+        ::continue::
+    end
+
+    for i = 1, #preProcess do
+        local blocked = preProcess[i]
+        insert(final, blocked)
+        local Path = AStar:FindPath(unit, blocked, range)
+        if Path and #Path > 2 then
+            for j = 1, #Path do
+                local P = Path[j]
+                if P and P.g and P.g > GetDistance(unit, blocked) then
+                    insert(final, P)
+                end
             end
         end
     end
 
-    return heh
-end
+    preProcess = nil
 
-function Area:GetArea(unit, range) --CURRENTLY WORKING ON
-    local _ = self:GetDrawPoints2(unit, range)
-    local P = Polygon()
+    local i = 1
+    while true do
+        local P = final[i]
+        Draw.Text(i, Vector(P.x, 0, P.z):To2D())
+        if not visited[i] then
+            visited[i] = true
+            insert(Result.points, P)
 
-    if next(self.postProcess) then
-        local newP = {}
-        local lastInsert = 1
+            local nearest, length, gibbon = nil, 9999, 0
+            for j = 1, #final do
+                local Q = final[j]
 
-        for i = 1, #self.postProcess do
-            local data = self.postProcess[i]
-            local insertAfter = data.position -1
-
-            for k = lastInsert, insertAfter do
-                insert(newP, _[k])
-            end
-            lastInsert = insertAfter + 1
-
-            local Path = LazyTheta:FindPath(unit, data.endPoint, range)
-            if Path and #Path > 0 then
-                local longest = 0
-                local val = {}
-
-                if #Path - 1 > 2 then
-                    newP[#newP] = nil
-                    for j = 1, #Path-1 do
-                        local Point = Path[j]
-                        local Point2 = j + 1 <= #Path and Path[j + 1] or nil
-                        Draw.Text(j, 10, Vector(Point.x, 0, Point.y):To2D())
-                        Draw.Circle(Point.x, 0, Point.y)
-                        insert(newP, Point)
+                if not visited[j] then
+                    local Dist = GetDistance(P, Q)
+                    if Dist < length then
+                        length = Dist
+                        nearest = Q
+                        gibbon = j
                     end
                 end
             end
-
-            if i == #self.postProcess and insertAfter < #_ then
-                for k = insertAfter, #_ do
-                    insert(newP, _[k])
-                end
+            if nearest then
+                insert(Result.points, nearest)
+                i = gibbon
             end
+        else
+            if i == #final or #Result.points > 5 then break end
         end
-
-        P.points = newP
-        return P
     end
 
-    P.points = _
-    return P
+    AStar:StopSession()
+    return Result
 end
 
 class("TWPrediction")
