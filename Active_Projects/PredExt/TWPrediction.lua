@@ -10,9 +10,9 @@
 -------------------------------------------------------------------------
 _G.TWPrediction_Version = 0.03
 --Requirements: See To Do at the bottom of the Script
-require '2DGeometry'
-require 'MapPosV2'
-local bh = require 'BinaryHeap'
+require '2DGeometry' --https://github.com/Maxxxel/GOS/blob/master/ext/Common/2DGeometry.lua
+require 'MapPosV2' --Summoner Rift only: https://github.com/Maxxxel/GOS/blob/master/ext/Common/MapPosV2.lua
+local bh = require 'BinaryHeap' --https://github.com/Maxxxel/GOS/blob/master/ext/Common/BinaryHeap.lua
 --Spell identifier, used for spell.type
 TWP_SkillShot = 1 --can hit just 1 target
 TWP_AOESkillShot = 2 --can hit multiple targets
