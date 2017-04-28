@@ -3,12 +3,13 @@
     0.01: Skeleton
     0.02: Added GetArea
     0.03: Added Pathfinding to GetArea
+    0.04: Improved preProcessing
     '---> Bugs:
             -Slow (AStar)
             -Unaccurate Sometimes (Lines 227 - 255)
 --]]
 -------------------------------------------------------------------------
-_G.TWPrediction_Version = 0.03
+_G.TWPrediction_Version = 0.04
 --Requirements: See To Do at the bottom of the Script
 require '2DGeometry' --https://github.com/Maxxxel/GOS/blob/master/ext/Common/2DGeometry.lua
 require 'MapPosV2' --Summoner Rift only: https://github.com/Maxxxel/GOS/blob/master/ext/Common/MapPosV2.lua
@@ -23,7 +24,7 @@ TWP_CURVE = 5 --Diana
 --Variables
 -------------------------------------------------------------------------
 local sqrt, pow, floor, modf, insert, remove, sin, cos = math.sqrt, math.pow, math.floor, math.modf, table.insert, table.remove, math.sin, math.cos
-local gridSize = 40
+local gridSize = 50
 local grrr = 0.01744444
 local Offset = {
     [1] = {x = 0,   y = 1},     --Top
@@ -208,20 +209,24 @@ function Area:GetArea(unit, range, qual)
         ::continue::
     end
 
+    local endSpot = {}
     for i = 1, #preProcess do
         local blocked = preProcess[i]
         insert(final, blocked)
         local Path = AStar:FindPath(unit, blocked, range)
-        if Path and #Path > 2 then
+        local Dist = GetDistance(unit, blocked)
+        if Path and #Path > 2 and Path[1].g > Dist and not endSpot[Path[1].x .. Path[1].z] then
+            endSpot[Path[1].x .. Path[1].z] = true
             for j = 1, #Path do
                 local P = Path[j]
-                if P and P.g and P.g > GetDistance(unit, blocked) then
+                if P and P.g and P.g > Dist then
                     insert(final, P)
                 end
             end
         end
     end
 
+    endSpot = nil
     preProcess = nil
 
     local i = 1
