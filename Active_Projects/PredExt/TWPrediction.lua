@@ -7,6 +7,7 @@
     '---> Bugs:
             -Slow (AStar)
             -Unaccurate Sometimes (Lines 227 - 255)
+    0.05: Added Clock Mode (Line 140)
 --]]
 -------------------------------------------------------------------------
 _G.TWPrediction_Version = 0.04
@@ -56,47 +57,6 @@ end
 
 local function GetDistance3D(p1, p2)
     return sqrt(pow((p2.x - p1.x),2) + pow((p2.y - p1.y),2) + pow((p2.z - p1.z),2))
-end
-
-local function lineOfSight(node, neighbor)
-        local x0, x1, y0, y1 = node.x, neighbor.x, node.y, neighbor.y
-        local sx,sy,dx,dy
-
-        if x0 < x1 then
-            sx = gridSize
-            dx = x1 - x0
-        else
-            sx = -gridSize
-            dx = x0 - x1
-        end
-
-        if y0 < y1 then
-            sy = gridSize
-            dy = y1 - y0
-        else
-            sy = -gridSize
-            dy = y0 - y1
-        end
-
-        local err, e2 = dx-dy, nil
-
-        if isWall({x = x0, y = 0, z = y0}) then return false end
-
-        while not(x0 == x1 and y0 == y1) do
-            e2 = err + err
-            if e2 > -dy then
-                err = err - dy
-                x0  = x0 + sx
-            end
-            if e2 < dx then
-                err = err + dx
-                y0  = y0 + sy
-            end
-
-            if isWall({x = x0, y = 0, z = y0}) then return false end
-        end
-
-        return true
 end
 
 class("AStar")
@@ -177,89 +137,112 @@ end
 
 class("Area")
 
+local clock = true
 function Area:GetArea(unit, range, qual)
     AStar:StartSession()
     local start = unit.pos or unit
     local turn = 0
-    local Quality = qual or 20
+    local Quality = qual or 8
     local Add = 360 / Quality
     local Result = Polygon()
     local preProcess = {}
     local visited = {}
     local final = {}
 
-    for i = 1, Quality do
-        turn = turn + Add
-        local Check = nil
-        local multi = turn * grrr
+    if not clock then
+        for i = 1, Quality do
+            turn = turn + Add
+            local Check = nil
+            local multi = turn * grrr
 
-        for _ = 0.1, 1, .025 do
-            local Vec = Vector(range * sin(multi), 0, range * cos(multi)):Normalized() * range * _
-            Check = Vector(start) + Vec
+            for _ = 0.1, 1, .025 do
+                local Vec = Vector(range * sin(multi), 0, range * cos(multi)):Normalized() * range * _
+                Check = Vector(start) + Vec
 
-            if isWall(Check) then
-                local Vec2 = Vector(range * sin(multi), 0, range * cos(multi)):Normalized() * range
-                insert(preProcess, {x = Check.x, y = Check.y, z = Check.z, target = {x = start.x + Vec2.x, y = Check.y, z = start.z + Vec2.z}})
-                
-                goto continue
-            end
-        end
-
-        insert(final, Check)
-        ::continue::
-    end
-
-    local endSpot = {}
-    for i = 1, #preProcess do
-        local blocked = preProcess[i]
-        insert(final, blocked)
-        local Path = AStar:FindPath(unit, blocked, range)
-        local Dist = GetDistance(unit, blocked)
-        if Path and #Path > 2 and Path[1].g > Dist and not endSpot[Path[1].x .. Path[1].z] then
-            endSpot[Path[1].x .. Path[1].z] = true
-            for j = 1, #Path do
-                local P = Path[j]
-                if P and P.g and P.g > Dist then
-                    insert(final, P)
+                if isWall(Check) then
+                    local Vec2 = Vector(range * sin(multi), 0, range * cos(multi)):Normalized() * range
+                    insert(preProcess, {x = Check.x, y = Check.y, z = Check.z, target = {x = start.x + Vec2.x, y = Check.y, z = start.z + Vec2.z}})
+                    
+                    goto continue
                 end
             end
+
+            insert(final, Check)
+            ::continue::
         end
-    end
 
-    endSpot = nil
-    preProcess = nil
-
-    local i = 1
-    while true do
-        local P = final[i]
-        Draw.Text(i, Vector(P.x, 0, P.z):To2D())
-        if not visited[i] then
-            visited[i] = true
-            insert(Result.points, P)
-
-            local nearest, length, gibbon = nil, 9999, 0
-            for j = 1, #final do
-                local Q = final[j]
-
-                if not visited[j] then
-                    local Dist = GetDistance(P, Q)
-                    if Dist < length then
-                        length = Dist
-                        nearest = Q
-                        gibbon = j
+        local endSpot = {}
+        for i = 1, #preProcess do
+            local blocked = preProcess[i]
+            insert(final, blocked)
+            local Path = AStar:FindPath(unit, blocked, range)
+            local Dist = GetDistance(unit, blocked)
+            if Path and #Path > 2 and Path[1].g > Dist and not endSpot[Path[1].x .. Path[1].z] then
+                endSpot[Path[1].x .. Path[1].z] = true
+                for j = 1, #Path do
+                    local P = Path[j]
+                    if P and P.g and P.g > Dist then
+                        insert(final, P)
                     end
                 end
             end
-            if nearest then
-                insert(Result.points, nearest)
-                i = gibbon
+        end
+
+        endSpot = nil
+        preProcess = nil
+
+        local c = 0
+        local i = 1
+        while true do
+            c = c + 1
+            local P = final[i]
+            -- Draw.Text(i, Vector(P.x, 0, P.z):To2D())
+            if not visited[i] then
+                visited[i] = true
+                insert(Result.points, P)
+
+                local nearest, length, gibbon = nil, 9999, 0
+                for j = 1, #final do
+                    local Q = final[j]
+
+                    if not visited[j] then
+                        local Dist = GetDistance(P, Q)
+                        if Dist < length then
+                            length = Dist
+                            nearest = Q
+                            gibbon = j
+                        end
+                    end
+                end
+
+                if nearest then
+                    i = gibbon
+                end
             end
-        else
-            if i == #final or #Result.points > 5 then break end
+
+            if c == 50 then break end
+        end
+
+        AStar:StopSession()
+    else
+        for i = 1, Quality do
+            turn = turn + Add
+            local Check = start
+            local multi = turn * grrr
+
+            for _ = .1, 1, .025 do
+                local Vec = Vector(range * sin(multi), 0, range * cos(multi)):Normalized() * range * _
+                Check = Vector(start) + Vec
+
+                if isWall(Check) then
+                    break
+                end
+            end
+
+            insert(Result.points, Check)
         end
     end
 
-    AStar:StopSession()
     return Result
 end
 
